@@ -2,7 +2,7 @@
 
 (function () {
   var STORAGE_KEY = 'auth_email_superior';
-  var GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyh9OKmQARm1aVw0CiclzTAwMqqgQeMEDq-WswVN7nHhs4-Dbk4N9fnPBkkZ6PZxy0-Xg/exec';
+  var GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxNxxzGmz2s0IpdCGW8tnEwsPvDAFNiqo-9DurrH60dgkJ4FGiEJrzb7D4Sc6u1EQQFTg/exec';
 
   // Runs synchronously in <head> — adds class before body renders to avoid flash
   if (!localStorage.getItem(STORAGE_KEY)) {
