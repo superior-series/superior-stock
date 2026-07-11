@@ -1,4 +1,3 @@
-import json
 import os
 from io import BytesIO
 
@@ -11,32 +10,7 @@ from openpyxl.utils import get_column_letter
 
 from image_collector import SOURCES, load_seen, save_urls, XLSX_FILE
 
-CONFIG_FILE = "config.json"
 app = Flask(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Config helpers
-# ---------------------------------------------------------------------------
-
-def _load_config():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE) as f:
-            return json.load(f)
-    return {}
-
-
-def _save_config(data):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def _mask_key(key):
-    if not key:
-        return ""
-    if len(key) <= 4:
-        return "•" * len(key)
-    return "•" * (len(key) - 4) + key[-4:]
 
 
 # ---------------------------------------------------------------------------
@@ -106,17 +80,17 @@ def collect():
     name, label, scraper = SOURCES[key]
 
     _api_key_map = {
-        "Unsplash": ("unsplash_api_key",
+        "Unsplash": ("unsplash",
                      "UnsplashのAPIキーが設定されていません。⚙️ API設定からキーを保存してください。"),
-        "Pexels":   ("pexels_api_key",
+        "Pexels":   ("pexels",
                      "PexelsのAPIキーが設定されていません。⚙️ API設定からキーを保存してください。"),
-        "Pixabay":  ("pixabay_api_key",
+        "Pixabay":  ("pixabay",
                      "PixabayのAPIキーが設定されていません。⚙️ API設定からキーを保存してください。"),
     }
     api_key = ""
     if source_name in _api_key_map:
-        config_field, err_msg = _api_key_map[source_name]
-        api_key = _load_config().get(config_field, "")
+        short_name, err_msg = _api_key_map[source_name]
+        api_key = data.get("api_keys", {}).get(short_name, "")
         if not api_key:
             return jsonify({"ok": False, "message": err_msg}), 400
 
@@ -208,66 +182,6 @@ def download():
         download_name=XLSX_FILE,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
-
-# ---------------------------------------------------------------------------
-# API: config (API keys for Unsplash / Pexels)
-# ---------------------------------------------------------------------------
-
-_SERVICE_KEY_MAP = {
-    "unsplash": "unsplash_api_key",
-    "pexels":   "pexels_api_key",
-    "pixabay":  "pixabay_api_key",
-}
-
-
-@app.route("/api/config", methods=["GET"])
-def get_config():
-    cfg = _load_config()
-    result = {}
-    for service, field in _SERVICE_KEY_MAP.items():
-        key = cfg.get(field, "")
-        result[service] = {"set": bool(key), "masked": _mask_key(key)}
-    return jsonify(result)
-
-
-@app.route("/api/config", methods=["POST"])
-def save_config_route():
-    data = request.get_json(silent=True) or {}
-    service = (data.get("service") or "").strip().lower()
-    key = (data.get("api_key") or "").strip()
-    if service not in _SERVICE_KEY_MAP:
-        return jsonify({"ok": False, "message": "不正なサービスです"}), 400
-    if not key:
-        return jsonify({"ok": False, "message": "キーを入力してください"}), 400
-    cfg = _load_config()
-    cfg[_SERVICE_KEY_MAP[service]] = key
-    _save_config(cfg)
-    return jsonify({"ok": True, "masked": _mask_key(key)})
-
-
-@app.route("/api/config/unsplash_key", methods=["DELETE"])
-def clear_unsplash_key():
-    cfg = _load_config()
-    cfg.pop("unsplash_api_key", None)
-    _save_config(cfg)
-    return jsonify({"ok": True})
-
-
-@app.route("/api/config/pexels_key", methods=["DELETE"])
-def clear_pexels_key():
-    cfg = _load_config()
-    cfg.pop("pexels_api_key", None)
-    _save_config(cfg)
-    return jsonify({"ok": True})
-
-
-@app.route("/api/config/pixabay_key", methods=["DELETE"])
-def clear_pixabay_key():
-    cfg = _load_config()
-    cfg.pop("pixabay_api_key", None)
-    _save_config(cfg)
-    return jsonify({"ok": True})
 
 
 # ---------------------------------------------------------------------------

@@ -165,7 +165,16 @@ document.getElementById('collect-btn').addEventListener('click', async () => {
     const res = await fetch('/api/collect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keyword, limit: Number(limit), source }),
+      body: JSON.stringify({
+        keyword,
+        limit: Number(limit),
+        source,
+        api_keys: {
+          unsplash: localStorage.getItem('superior_stock_unsplash_key') || '',
+          pexels: localStorage.getItem('superior_stock_pexels_key') || '',
+          pixabay: localStorage.getItem('superior_stock_pixabay_key') || '',
+        },
+      }),
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -230,41 +239,34 @@ document.getElementById('delete-btn').addEventListener('click', async () => {
 
 const modal = document.getElementById('settings-modal');
 
-async function loadConfig() {
-  try {
-    const res = await fetch('/api/config');
-    const data = await res.json();
+const STORAGE_KEY_PREFIX = 'superior_stock_';
 
-    // Unsplash
-    const uWrap = document.getElementById('key-current-wrap');
-    const uMasked = document.getElementById('key-masked');
-    if (data.unsplash && data.unsplash.set) {
-      uMasked.textContent = data.unsplash.masked;
-      uWrap.style.display = 'flex';
-    } else {
-      uWrap.style.display = 'none';
-    }
+function _storageKeyFor(service) {
+  return STORAGE_KEY_PREFIX + service + '_key';
+}
 
-    // Pexels
-    const pWrap = document.getElementById('pexels-key-current-wrap');
-    const pMasked = document.getElementById('pexels-key-masked');
-    if (data.pexels && data.pexels.set) {
-      pMasked.textContent = data.pexels.masked;
-      pWrap.style.display = 'flex';
-    } else {
-      pWrap.style.display = 'none';
-    }
+function _maskKey(key) {
+  if (!key) return '';
+  if (key.length <= 4) return '•'.repeat(key.length);
+  return '•'.repeat(key.length - 4) + key.slice(-4);
+}
 
-    // Pixabay
-    const pxWrap = document.getElementById('pixabay-key-current-wrap');
-    const pxMasked = document.getElementById('pixabay-key-masked');
-    if (data.pixabay && data.pixabay.set) {
-      pxMasked.textContent = data.pixabay.masked;
-      pxWrap.style.display = 'flex';
-    } else {
-      pxWrap.style.display = 'none';
-    }
-  } catch (_) {}
+function _refreshKeyDisplay(service, wrapId, maskedId) {
+  const wrap = document.getElementById(wrapId);
+  const masked = document.getElementById(maskedId);
+  const key = localStorage.getItem(_storageKeyFor(service)) || '';
+  if (key) {
+    masked.textContent = _maskKey(key);
+    wrap.style.display = 'flex';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function loadConfig() {
+  _refreshKeyDisplay('unsplash', 'key-current-wrap', 'key-masked');
+  _refreshKeyDisplay('pexels', 'pexels-key-current-wrap', 'pexels-key-masked');
+  _refreshKeyDisplay('pixabay', 'pixabay-key-current-wrap', 'pixabay-key-masked');
 }
 
 document.getElementById('settings-btn').addEventListener('click', () => {
@@ -283,54 +285,41 @@ modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
 // --- 汎用キー保存ヘルパー ---
-async function saveApiKey(service, inputId, maskedId, wrapId) {
+function saveApiKey(service, inputId, maskedId, wrapId) {
   const key = document.getElementById(inputId).value.trim();
   if (!key) { showSettingsMsg('APIキーを入力してください。', 'error'); return; }
-  try {
-    const res = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service, api_key: key }),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      document.getElementById(inputId).value = '';
-      document.getElementById(maskedId).textContent = data.masked;
-      document.getElementById(wrapId).style.display = 'flex';
-      showSettingsMsg('保存しました。', 'success');
-    } else {
-      showSettingsMsg(data.message || '保存に失敗しました。', 'error');
-    }
-  } catch (_) { showSettingsMsg('通信エラーが発生しました。', 'error'); }
+  localStorage.setItem(_storageKeyFor(service), key);
+  document.getElementById(inputId).value = '';
+  document.getElementById(maskedId).textContent = _maskKey(key);
+  document.getElementById(wrapId).style.display = 'flex';
+  showSettingsMsg('保存しました。', 'success');
 }
 
-async function clearApiKey(endpoint, inputId, maskedId, wrapId) {
-  try {
-    await fetch(endpoint, { method: 'DELETE' });
-    document.getElementById(wrapId).style.display = 'none';
-    document.getElementById(maskedId).textContent = '';
-    document.getElementById(inputId).value = '';
-    showSettingsMsg('クリアしました。', 'success');
-  } catch (_) { showSettingsMsg('通信エラーが発生しました。', 'error'); }
+function clearApiKey(service, inputId, maskedId, wrapId) {
+  localStorage.removeItem(_storageKeyFor(service));
+  document.getElementById(wrapId).style.display = 'none';
+  document.getElementById(maskedId).textContent = '';
+  document.getElementById(inputId).value = '';
+  showSettingsMsg('クリアしました。', 'success');
 }
 
 // Unsplash
 document.getElementById('key-save-btn').addEventListener('click', () =>
   saveApiKey('unsplash', 'key-input', 'key-masked', 'key-current-wrap'));
 document.getElementById('key-clear-btn').addEventListener('click', () =>
-  clearApiKey('/api/config/unsplash_key', 'key-input', 'key-masked', 'key-current-wrap'));
+  clearApiKey('unsplash', 'key-input', 'key-masked', 'key-current-wrap'));
 
 // Pexels
 document.getElementById('pexels-key-save-btn').addEventListener('click', () =>
   saveApiKey('pexels', 'pexels-key-input', 'pexels-key-masked', 'pexels-key-current-wrap'));
 document.getElementById('pexels-key-clear-btn').addEventListener('click', () =>
-  clearApiKey('/api/config/pexels_key', 'pexels-key-input', 'pexels-key-masked', 'pexels-key-current-wrap'));
+  clearApiKey('pexels', 'pexels-key-input', 'pexels-key-masked', 'pexels-key-current-wrap'));
 
 // Pixabay
 document.getElementById('pixabay-key-save-btn').addEventListener('click', () =>
   saveApiKey('pixabay', 'pixabay-key-input', 'pixabay-key-masked', 'pixabay-key-current-wrap'));
 document.getElementById('pixabay-key-clear-btn').addEventListener('click', () =>
-  clearApiKey('/api/config/pixabay_key', 'pixabay-key-input', 'pixabay-key-masked', 'pixabay-key-current-wrap'));
+  clearApiKey('pixabay', 'pixabay-key-input', 'pixabay-key-masked', 'pixabay-key-current-wrap'));
 
 // ---------------------------------------------------------------------------
 // Image download
